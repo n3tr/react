@@ -13,10 +13,36 @@ describe('DOMPropertyOperations', () => {
   let React;
   let ReactDOM;
 
+  function createPerformancePolyfillWithThreshold(threshold) {
+    let startCalled= false;
+    return () => {
+      if (startCalled) {
+        startCalled = false;
+        return threshold;
+      }
+      startCalled = true;
+      return 0;
+    };
+  }
+
+  function createPerformancePolyfill() {
+    return {
+      now: () => {
+        return Date.now();
+      }
+    }
+  }
+
   beforeEach(() => {
     jest.resetModules();
+    global.performance = createPerformancePolyfill();
+
     React = require('react');
     ReactDOM = require('react-dom');
+  });
+
+  afterEach(() => {
+    delete global.performance;
   });
 
   describe('setValueForProperty', () => {
@@ -124,6 +150,19 @@ describe('DOMPropertyOperations', () => {
       ReactDOM.render(<progress value={30} />, container);
       ReactDOM.render(<progress value="30" />, container);
       expect(container.firstChild.setAttribute.calls.count()).toBe(2);
+    });
+
+    it('should warn on if stringifying an attribute takes too long', () => {      
+      const container = document.createElement('div');
+      const rest = { title: 'foo', src: 'bar' };
+      const mockNowFn = jest.fn().mockImplementation(createPerformancePolyfillWithThreshold(3000));
+      global.performance.now = mockNowFn;
+      expect(() => {
+        ReactDOM.render(<img {...rest} />, container);
+      }).toWarnDev([
+        'Warning: Stringifying your attribute is causing perfomance issues.',
+        'Warning: Stringifying your attribute is causing perfomance issues.',
+      ]);
     });
   });
 

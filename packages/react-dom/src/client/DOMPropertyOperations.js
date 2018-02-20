@@ -7,6 +7,7 @@
  * @flow
  */
 
+import warning from 'fbjs/lib/warning'
 import {
   getPropertyInfo,
   shouldIgnoreAttribute,
@@ -17,6 +18,21 @@ import {
 } from '../shared/DOMProperty';
 
 import type {PropertyInfo} from '../shared/DOMProperty';
+
+
+const hasNativePerformanceNow =
+  typeof performance === 'object' && typeof performance.now === 'function';
+
+function stringifyWithPerformanceWarning(value: any) {
+  if (hasNativePerformanceNow) {
+    const stringifyStart = performance.now();
+    const attributeValue = '' + value;
+    const stringifyEnd = performance.now();
+    warning(stringifyEnd - stringifyStart <= 2000, 'Stringifying your attribute is causing perfomance issues.')
+    return attributeValue;
+  }
+  return '' + value;
+}
 
 /**
  * Get the value for a property on a node. Only used in DEV for SSR validation.
@@ -133,7 +149,13 @@ export function setValueForProperty(
       if (value === null) {
         node.removeAttribute(attributeName);
       } else {
-        node.setAttribute(attributeName, '' + (value: any));
+        let attributeValue;
+        if (__DEV__) {
+          attributeValue = stringifyWithPerformanceWarning(value);
+        } else {
+          attributeValue = '' + (value: any);
+        }
+        node.setAttribute(attributeName, attributeValue);
       }
     }
     return;
@@ -163,7 +185,12 @@ export function setValueForProperty(
     } else {
       // `setAttribute` with objects becomes only `[object]` in IE8/9,
       // ('' + value) makes it output the correct toString()-value.
-      attributeValue = '' + (value: any);
+      if (__DEV__) {
+        attributeValue = stringifyWithPerformanceWarning(value);
+      } else {
+        attributeValue = '' + (value: any);
+      }
+      
     }
     if (attributeNamespace) {
       node.setAttributeNS(attributeNamespace, attributeName, attributeValue);
