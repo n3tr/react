@@ -13,24 +13,12 @@ describe('DOMPropertyOperations', () => {
   let React;
   let ReactDOM;
 
-  function createPerformancePolyfillWithThreshold(threshold) {
-    let startCalled= false;
-    return () => {
-      if (startCalled) {
-        startCalled = false;
-        return threshold;
-      }
-      startCalled = true;
-      return 0;
-    };
-  }
-
   function createPerformancePolyfill() {
     return {
       now: () => {
         return Date.now();
-      }
-    }
+      },
+    };
   }
 
   beforeEach(() => {
@@ -152,17 +140,43 @@ describe('DOMPropertyOperations', () => {
       expect(container.firstChild.setAttribute.calls.count()).toBe(2);
     });
 
-    it('should warn on if stringifying an attribute takes too long', () => {      
-      const container = document.createElement('div');
-      const rest = { title: 'foo', src: 'bar' };
-      const mockNowFn = jest.fn().mockImplementation(createPerformancePolyfillWithThreshold(3000));
-      global.performance.now = mockNowFn;
-      expect(() => {
+    describe('setValueForProperty performance warning', () => {
+      function createPerformancePolyfillWithThreshold(threshold) {
+        let startCalled = false;
+        return () => {
+          if (startCalled) {
+            startCalled = false;
+            return threshold;
+          }
+          startCalled = true;
+          return 0;
+        };
+      }
+
+      it('should warn on if stringifying an attribute takes too long', () => {      
+        const container = document.createElement('div');
+        const rest = { title: 'foo', src: 'bar' };
+        const mockNowFn = jest.fn();
+        mockNowFn.mockImplementation(createPerformancePolyfillWithThreshold(3000));
+        global.performance.now = mockNowFn;
+
+        expect(() => {
+          ReactDOM.render(<img {...rest} />, container);
+        }).toWarnDev([
+          'Warning: Stringifying your attribute is causing perfomance issues.',
+          'Warning: Stringifying your attribute is causing perfomance issues.',
+        ]);
+      });
+
+      it('should not warn if stringify take less than threshold', () => {      
+        const container = document.createElement('div');
+        const rest = { title: 'foo' };
+        const mockNowFn = jest.fn();
+        mockNowFn.mockImplementation(createPerformancePolyfillWithThreshold(1000));
+        global.performance.now = mockNowFn;
+        
         ReactDOM.render(<img {...rest} />, container);
-      }).toWarnDev([
-        'Warning: Stringifying your attribute is causing perfomance issues.',
-        'Warning: Stringifying your attribute is causing perfomance issues.',
-      ]);
+      });
     });
   });
 
