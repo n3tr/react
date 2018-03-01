@@ -23,15 +23,22 @@ import type {PropertyInfo} from '../shared/DOMProperty';
 const hasNativePerformanceNow =
   typeof performance === 'object' && typeof performance.now === 'function';
 
+const attributeStringifyWarningThreshold = 2000;
+
+const now = hasNativePerformanceNow
+  ? () => performance.now()
+  : () => Date.now();
+  
 function stringifyWithPerformanceWarning(value: any) {
-  if (hasNativePerformanceNow) {
-    const stringifyStart = performance.now();
-    const attributeValue = '' + value;
-    const stringifyEnd = performance.now();
-    warning(stringifyEnd - stringifyStart <= 2000, 'Stringifying your attribute is causing perfomance issues.')
-    return attributeValue;
-  }
-  return '' + value;
+  const stringifyStart = now();
+  const attributeValue = '' + value;
+  const stringifyEnd = now();
+  const timeSpent = stringifyEnd - stringifyStart;
+  warning(
+    timeSpent <= attributeStringifyWarningThreshold,
+    'Stringifying your attribute is causing perfomance issues.'
+  );
+  return attributeValue;
 }
 
 /**
